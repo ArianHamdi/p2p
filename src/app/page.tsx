@@ -1,95 +1,106 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
 
-export default function Home() {
+import React, { useRef, useState, useEffect } from "react";
+
+const VideoCall: React.FC = () => {
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const pc = useRef<RTCPeerConnection>(new RTCPeerConnection());
+  const [offer, setOffer] = useState<string>("");
+  const [answer, setAnswer] = useState<string>("");
+
+  const startCall = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      stream.getTracks().forEach((track) => pc.current.addTrack(track, stream));
+
+      const localOffer = await pc.current.createOffer();
+      await pc.current.setLocalDescription(localOffer);
+      setOffer(JSON.stringify(localOffer));
+    } catch (error) {
+      console.error("Error starting call:", error);
+    }
+  };
+
+  const handleAnswer = async () => {
+    try {
+      const remoteAnswer = JSON.parse(answer) as RTCSessionDescriptionInit;
+      await pc.current.setRemoteDescription(
+        new RTCSessionDescription(remoteAnswer)
+      );
+    } catch (error) {
+      console.error("Error handling answer:", error);
+    }
+  };
+
+  const handleOffer = async () => {
+    try {
+      const remoteOffer = JSON.parse(offer) as RTCSessionDescriptionInit;
+      await pc.current.setRemoteDescription(
+        new RTCSessionDescription(remoteOffer)
+      );
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      stream.getTracks().forEach((track) => pc.current.addTrack(track, stream));
+
+      const localAnswer = await pc.current.createAnswer();
+      await pc.current.setLocalDescription(localAnswer);
+      setAnswer(JSON.stringify(localAnswer));
+    } catch (error) {
+      console.error("Error handling offer:", error);
+    }
+  };
+
+  useEffect(() => {
+    pc.current.ontrack = (event) => {
+      if (
+        remoteVideoRef.current &&
+        remoteVideoRef.current.srcObject !== event.streams[0]
+      ) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    pc.current.onicecandidate = (event) => {
+      if (event.candidate) {
+        // Handle ICE candidates if needed
+        console.log("New ICE candidate:", event.candidate);
+      }
+    };
+  }, []);
+
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>src/app/page.tsx</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
+    <div>
+      <h2>Local Video</h2>
+      <video ref={localVideoRef} autoPlay playsInline></video>
+      <h2>Remote Video</h2>
+      <video ref={remoteVideoRef} autoPlay playsInline></video>
+      <div>
+        <button onClick={startCall}>Start Call</button>
+        <textarea value={offer} readOnly rows={6} cols={50}></textarea>
+        <button onClick={handleOffer}>Receive Call</button>
+        <textarea
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          rows={6}
+          cols={50}
+        ></textarea>
+        <button onClick={handleAnswer}>Submit Answer</button>
       </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore starter templates for Next.js.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    </div>
   );
-}
+};
+
+export default VideoCall;
